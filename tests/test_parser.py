@@ -76,3 +76,18 @@ def test_log_entry_severity_level_unknown():
         raw="test",
     )
     assert entry.severity_level == -1
+
+
+def test_log_entry_severity_level_matches_severity_order():
+    """Verify that severity_level values align with the SEVERITY_ORDER mapping."""
+    for severity, expected_level in SEVERITY_ORDER.items():
+        entry = LogEntry(
+            timestamp=datetime.now(),
+            severity=severity,
+            message="test",
+            raw="test",
+        )
+        assert entry.severity_level == expected_level, (
+            f"Expected severity_level {expected_level} for '{severity}', "
+            f"got {entry.severity_level}"
+        )
