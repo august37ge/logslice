@@ -1,55 +1,65 @@
-"""High-level pipeline that wires parser, slicer, formatter, output, and stats."""
+"""High-level pipeline that wires together slicing, normalizing, and rendering."""
+
 from __future__ import annotations
 
 from datetime import datetime
-from typing import IO, Optional
+from pathlib import Path
+from typing import Optional
 
-from logslice.slicer import slice_file
 from logslice.formatter import get_formatter, render_entries
+from logslice.normalize import normalize_entries
 from logslice.output import write_to_stream
-from logslice.stats import compute_stats, format_stats, SliceStats
+from logslice.slicer import slice_file
+from logslice.stats import SliceStats, compute_stats
+
+import io
 
 
 def run_pipeline(
-    path: str,
+    log_path: Path,
+    *,
     start: Optional[datetime] = None,
     end: Optional[datetime] = None,
-    min_severity: Optional[str] = None,
+    severity: Optional[str] = None,
     fmt: str = "plain",
-    output: IO[str] = None,
-    show_stats: bool = False,
+    normalize: bool = True,
+    stream: Optional[io.TextIOBase] = None,
+    output_path: Optional[Path] = None,
 ) -> SliceStats:
-    """Execute the full log-slicing pipeline and return statistics.
+    """Run the full logslice pipeline and return statistics.
 
     Parameters
     ----------
-    path:         Path to the log file.
-    start:        Optional lower bound for timestamp filtering.
-    end:          Optional upper bound for timestamp filtering.
-    min_severity: Optional minimum severity level (e.g. 'WARNING').
-    fmt:          Output format – 'plain', 'colored', or 'json'.
-    output:       Writable stream; defaults to sys.stdout.
-    show_stats:   If True, print a stats summary after the entries.
-
-    Returns
-    -------
-    SliceStats collected over the matched entries.
+    log_path:    Path to the log file to process.
+    start:       Inclusive lower-bound timestamp filter.
+    end:         Inclusive upper-bound timestamp filter.
+    severity:    Minimum severity level to include (e.g. ``"WARNING"``).
+    fmt:         Output format — ``"plain"``, ``"colored"``, or ``"json"``.
+    normalize:   When *True* severity/message normalization is applied.
+    stream:      If provided, rendered lines are written here.
+    output_path: If provided, rendered lines are also written to this file.
     """
-    import sys
+    entries, skipped = slice_file(
+        log_path,
+        start=start,
+        end=end,
+        min_severity=severity,
+    )
 
-    if output is None:
-        output = sys.stdout
+    if normalize:
+        entries = list(normalize_entries(entries))
+    else:
+        entries = list(entries)
 
     formatter = get_formatter(fmt)
-    entries = list(slice_file(path, start=start, end=end, min_severity=min_severity))
-    lines = render_entries(entries, formatter)
-    write_to_stream(lines, output)
+    lines = list(render_entries(entries, formatter))
 
-    stats = compute_stats(entries)
+    if stream is not None:
+        write_to_stream(lines, stream)
 
-    if show_stats:
-        output.write("\n--- stats ---\n")
-        output.write(format_stats(stats))
-        output.write("\n")
+    if output_path is not None:
+        from logslice.output import write_lines
+        write_lines(lines, output_path)
 
+    stats = compute_stats(entries, skipped_lines=skipped)
     return stats
