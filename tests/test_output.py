@@ -23,6 +23,14 @@ def test_write_to_stream_content():
     assert buf.read() == "hello\nworld\n"
 
 
+def test_write_to_stream_empty():
+    buf = io.StringIO()
+    count = write_to_stream([], buf)
+    assert count == 0
+    buf.seek(0)
+    assert buf.read() == ""
+
+
 def test_write_lines_to_file(tmp_path: Path):
     out = tmp_path / "out.log"
     count = write_lines(["a", "b", "c"], out)
@@ -56,3 +64,10 @@ def test_write_lines_empty_iterable(tmp_path: Path):
     count = write_lines([], out)
     assert count == 0
     assert out.read_text(encoding="utf-8") == ""
+
+
+def test_write_lines_creates_parent_directories(tmp_path: Path):
+    out = tmp_path / "nested" / "dir" / "out.log"
+    count = write_lines(["hello"], out)
+    assert count == 1
+    assert out.read_text(encoding="utf-8") == "hello\n"
