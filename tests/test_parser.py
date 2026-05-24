@@ -91,3 +91,11 @@ def test_log_entry_severity_level_matches_severity_order():
             f"Expected severity_level {expected_level} for '{severity}', "
             f"got {entry.severity_level}"
         )
+
+
+@pytest.mark.parametrize("line,expected_ts,_sev,_msg", SAMPLE_LINES)
+def test_parse_line_raw_preserved(line, expected_ts, _sev, _msg):
+    """Ensure the raw field always stores the original unparsed line."""
+    entry = parse_line(line)
+    assert entry is not None
+    assert entry.raw == line
