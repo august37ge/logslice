@@ -20,6 +20,7 @@ def replay_entries(
     entries: Iterable[LogEntry],
     speed: float = 1.0,
     on_entry: Optional[Callable[[LogEntry], None]] = None,
+    max_delay: Optional[float] = None,
 ) -> Generator[LogEntry, None, None]:
     """Yield entries with real-time delays proportional to their timestamps.
 
@@ -27,12 +28,17 @@ def replay_entries(
         entries: Iterable of LogEntry objects sorted by timestamp.
         speed: Playback multiplier. 2.0 = twice as fast, 0.5 = half speed.
         on_entry: Optional callback invoked just before each entry is yielded.
+        max_delay: Optional cap (in seconds) on the wall-clock sleep between
+            entries. Useful when log gaps are very large and you don't want
+            replay to stall for minutes at a time.
 
     Yields:
         LogEntry objects in original order.
     """
     if speed <= 0:
         raise ValueError(f"speed must be positive, got {speed}")
+    if max_delay is not None and max_delay < 0:
+        raise ValueError(f"max_delay must be non-negative, got {max_delay}")
 
     prev_log_time: Optional[datetime] = None
     prev_wall_time: Optional[float] = None
@@ -43,6 +49,8 @@ def replay_entries(
         if prev_log_time is not None and prev_wall_time is not None:
             log_delta = (log_time - prev_log_time).total_seconds()
             wall_delay = log_delta / speed
+            if max_delay is not None:
+                wall_delay = min(wall_delay, max_delay)
             if wall_delay > 0:
                 elapsed = time.monotonic() - prev_wall_time
                 sleep_for = wall_delay - elapsed
