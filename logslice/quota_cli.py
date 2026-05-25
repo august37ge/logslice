@@ -45,6 +45,21 @@ def build_parser() -> argparse.ArgumentParser:
     return p
 
 
+def _open_input(path: str):
+    """Open *path* for reading, or return ``sys.stdin`` when *path* is ``'-'``.
+
+    Returns a tuple of ``(stream, should_close)`` so the caller knows whether
+    it is responsible for closing the stream.
+    """
+    if path == "-":
+        return sys.stdin, False
+    try:
+        return open(path, "r", encoding="utf-8"), True  # noqa: WPS515
+    except OSError as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        raise
+
+
 def main(argv: List[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
 
@@ -58,19 +73,15 @@ def main(argv: List[str] | None = None) -> int:
         print(f"error: {exc}", file=sys.stderr)
         return 2
 
-    if args.file == "-":
-        stream = sys.stdin
-    else:
-        try:
-            stream = open(args.file, "r", encoding="utf-8")  # noqa: WPS515
-        except OSError as exc:
-            print(f"error: {exc}", file=sys.stderr)
-            return 1
+    try:
+        stream, should_close = _open_input(args.file)
+    except OSError:
+        return 1
 
     try:
         raw_entries = [e for line in stream if (e := parse_line(line)) is not None]
     finally:
-        if args.file != "-":
+        if should_close:
             stream.close()
 
     kept, result = quota_entries(raw_entries, cfg)
