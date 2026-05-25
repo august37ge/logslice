@@ -24,6 +24,17 @@ class CorrelatedGroup:
         severities = [e.severity for e in self.all_entries]
         return severities[levels.index(max(levels))]
 
+    @property
+    def time_span_seconds(self) -> float:
+        """Return the total time span (in seconds) covered by all entries in the group.
+
+        Returns 0.0 if the group contains only the anchor entry.
+        """
+        if not self.related:
+            return 0.0
+        timestamps = [e.timestamp for e in self.all_entries]
+        return (max(timestamps) - min(timestamps)).total_seconds()
+
 
 def _within_window(anchor: LogEntry, candidate: LogEntry, window_seconds: float) -> bool:
     delta = abs((candidate.timestamp - anchor.timestamp).total_seconds())
